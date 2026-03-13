@@ -1,15 +1,18 @@
-#student name: Juelin Zhou
+#student name:   Juelin Zhou
 #student number: 90724907
 
 import multiprocessing
 import random #is used to cause some randomness 
 import time   #is used to cause some delay to simulate thinking or eating times
 
-def philosopher(id: int, chopstick: list): 
+def philosopher(id: int, chopstick: list, table: multiprocessing.Semaphore):
     """
        implements a thinking-eating philosopher
        id is used to identifier philosopher #id (id is between 0 to numberOfPhilosophers-1)
-       chopstick is the list of semaphores associated with the chopsticks 
+       chopstick is the list of semaphores associated with the chopsticks
+       
+       table is a semaphore that represents the number of seats available at th table. it is initialized to 4
+
     """
     def eatForAWhile():   #simulates philosopher eating time with a random delay
         print(f"DEBUG: philosopher{id} eating")
@@ -24,6 +27,10 @@ def philosopher(id: int, chopstick: list):
         rightChopstick = (id + 1) % 5      #5 is number of philosophers
 
         #to simplify, try statement not used here
+
+        # by limiting table to only 4 seats, whilst not changing the number of philosophers,
+        # one chopstick will always be free. there fore,  circular wait can never form
+        table.acquire() # acquire a seat, but blocks if 4 others are already competing
         chopstick[leftChopstick].acquire()
         print(f"DEBUG: philosopher{id} has chopstick{leftChopstick}")
         chopstick[rightChopstick].acquire()
@@ -36,6 +43,7 @@ def philosopher(id: int, chopstick: list):
         print(f"DEBUG: philosopher{id} is to release chopstick{leftChopstick}")
         chopstick[leftChopstick].release()
 
+        table.release() # release the seat so another philosopher may compete for a seat at the table
         thinkForAWhile()  #use this line as is
 
 if __name__ == "__main__":
@@ -45,9 +53,13 @@ if __name__ == "__main__":
     for i in range(numberOfPhilosophers):             
         semaphoreList.append(multiprocessing.Semaphore(1))    #one semaphore per chopstick
 
+    # limits the number of philosophers competing for chopsticks to 4 (numberOfPhilosophers - 1)
+    # this prevents circular wait from ever involving all 5 philosophers
+    tableSemaphore = multiprocessing.Semaphore(numberOfPhilosophers - 1) # Semaphore(4)
+
     philosopherProcessList = list()
     for i in range(numberOfPhilosophers): #instantiate all processes representing philosophers
-        philosopherProcessList.append(multiprocessing.Process(target=philosopher, args=(i, semaphoreList)))
+        philosopherProcessList.append(multiprocessing.Process(target=philosopher, args=(i, semaphoreList, tableSemaphore)))
     for j in range(numberOfPhilosophers): #start all child processes
         philosopherProcessList[j].start()
     for k in range(numberOfPhilosophers): #join all child processes
